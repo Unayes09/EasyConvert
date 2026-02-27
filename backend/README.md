@@ -63,9 +63,3 @@ docker-compose up --build
 # View logs for the PDF worker
 docker-compose logs -f pdf-worker
 ```
-
-### **Database Access**
-- **Host**: `localhost`
-- **Port**: `3307` (Mapped from internal 3306 to avoid local conflicts)
-- **Database**: `easyconvert`
-- **User**: `root` / `20020808`
