@@ -8,3 +8,4 @@ python-multipart
 cryptography
 celery
 pymupdf
+pdf2docx

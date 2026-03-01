@@ -18,6 +18,12 @@ The project is built using a "Nervous System" design where multiple specialized 
 
 ## 🛠️ API Documentation
 
+Each service has its own interactive Swagger UI.
+
+- **Gateway Service**: `http://localhost:8000/docs` (Note: Proxy routes show generic parameters)
+- **PDF Service**: `http://localhost:8001/docs` (Recommended for testing PDF specific APIs)
+- **Image Service**: `http://localhost:8002/docs`
+
 All services are accessible through the Gateway on port `8000`.
 
 ### **1. Gateway & Upload**
@@ -32,7 +38,54 @@ All services are accessible through the Gateway on port `8000`.
 - `GET /pdf/download-images/{task_id}`: Downloads a `.zip` archive containing all converted pages as PNGs.
   - *Note: This endpoint automatically triggers a cleanup, deleting the original PDF and images from the database after a successful download.*
 
+### **3. PDF Modification (Synchronous)**
+- `POST /pdf/insert-image`: Inserts an image as a new page into an existing PDF.
+  - **Inputs (Multipart Form)**: 
+    - `pdf_file`: The source PDF.
+    - `image_file`: The image to insert (PNG/JPG).
+    - `split_index`: The page index where the image should be inserted (0 for the very first page).
+  - **Output**: Returns the modified PDF file directly.
+
+- `POST /pdf/split-pdf`: Extracts specific pages or ranges from a PDF into separate files.
+  - **Inputs (Multipart Form)**:
+    - `file`: The source PDF.
+    - `ranges`: A string representing page ranges.
+      - **Format**: Comma-separated numbers or ranges (1-based).
+      - **Example**: `"1-3, 5"` will extract pages 1-3 into one PDF and page 5 into another.
+  - **Output**: Returns a **ZIP archive** containing the separate PDF files (or a single PDF if only one range was requested).
+
+- `POST /pdf/add-page-numbers`: Adds "Page X of Y" labels to the bottom right of every page.
+  - **Inputs (Multipart Form)**:
+    - `file`: The source PDF.
+  - **Output**: Returns the PDF with added page numbers.
+
+- `POST /pdf/merge-pdfs`: Merges multiple PDF files into one.
+  - **Inputs (Multipart Form)**:
+    - `files`: One or more PDF files.
+  - **Output**: Returns the merged PDF file directly.
+
+- `POST /pdf/pdf-to-docx`: Converts a PDF file into a Word document (.docx).
+  - **Inputs (Multipart Form)**:
+    - `file`: The source PDF.
+  - **Output**: Returns the converted .docx file.
+
 ---
+
+## 🖼️ Image Service APIs
+
+All image operations are synchronous and available via the Gateway on port `8000`.
+
+### **1. Format & Conversion**
+- `POST /image/change-format`: Changes an image's format (e.g., PNG to WEBP).
+  - **Params**: `target_format` (PNG, JPG, WEBP, etc.)
+- `POST /image/images-to-pdf`: Combines one or more images into a single PDF.
+  - **Inputs**: Multiple `files` (images).
+
+### **2. Editing & Manipulation**
+- `POST /image/edit-image`: Adjust visual properties.
+  - **Params**: `brightness`, `contrast`, `sharpness` (float, 1.0 is default), `grayscale` (bool), `rotate` (int).
+- `POST /image/crop-image`: Crops images based on percentage from each side.
+  - **Params**: `left`, `right`, `top`, `bottom` (float, 0-100).
 
 ## 📂 Project Structure
 

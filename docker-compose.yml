@@ -1,0 +1,97 @@
+services:
+  gateway:
+    build: ./backend/gateway
+    ports:
+      - "8000:8000"
+    environment:
+      - PDF_SERVICE_URL=http://pdf-service:8001
+      - IMAGE_SERVICE_URL=http://image-service:8002
+      - DATABASE_URL=mysql+pymysql://root:20020808@mysql:3306/easyconvert
+    depends_on:
+      - mysql
+      - pdf-service
+      - image-service
+    networks:
+      - easyconvert-net
+    restart: always
+
+  pdf-service:
+    build: ./backend/pdf-service
+    ports:
+      - "8001:8001"
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - DATABASE_URL=mysql+pymysql://root:20020808@mysql:3306/easyconvert
+    depends_on:
+      - mysql
+      - redis
+    networks:
+      - easyconvert-net
+    restart: always
+
+  pdf-worker:
+    build: ./backend/pdf-service
+    command: celery -A app.celery_app worker --loglevel=info
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - DATABASE_URL=mysql+pymysql://root:20020808@mysql:3306/easyconvert
+    depends_on:
+      - redis
+      - mysql
+    networks:
+      - easyconvert-net
+    restart: always
+
+  image-service:
+    build: ./backend/image-service
+    ports:
+      - "8002:8002"
+    networks:
+      - easyconvert-net
+    restart: always
+
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: "20020808"
+      MYSQL_DATABASE: easyconvert
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - easyconvert-net
+    healthcheck:
+      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+    restart: always
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - easyconvert-net
+    restart: always
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_GATEWAY=http://localhost:8000
+    depends_on:
+      - gateway
+    networks:
+      - easyconvert-net
+    restart: always
+
+networks:
+  easyconvert-net:
+    driver: bridge
+
+volumes:
+  mysql-data:
