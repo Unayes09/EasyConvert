@@ -95,15 +95,16 @@ async def proxy_pdf(path: str, request: Request):
                     error_detail = response.text
                 raise HTTPException(status_code=response.status_code, detail=error_detail)
 
-            # Handle PDF streaming responses
-            if "application/pdf" in content_type:
-                return StreamingResponse(
-                    io.BytesIO(response.content),
-                    media_type="application/pdf",
-                    headers={"Content-Disposition": response.headers.get("Content-Disposition")}
-                )
-            
-            return response.json() if "application/json" in content_type else response.content
+            # Handle JSON responses
+            if "application/json" in content_type:
+                return response.json()
+
+            # Handle all other responses (PDF, DOCX, ZIP, Images, etc.) as StreamingResponse
+            return StreamingResponse(
+                io.BytesIO(response.content),
+                media_type=content_type,
+                headers={"Content-Disposition": response.headers.get("Content-Disposition")}
+            )
         except httpx.RequestError as exc:
             raise HTTPException(status_code=500, detail=f"Error connecting to PDF service: {exc}")
 

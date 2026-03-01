@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import FileUploader from '@/components/FileUploader';
-import { Loader2, Download, AlertCircle, Crop, CheckCircle2, RotateCcw } from 'lucide-react';
+import { Loader2, Download, AlertCircle, Crop, CheckCircle2, RotateCcw, MousePointer2 } from 'lucide-react';
 import { parseAxiosError } from '@/utils/error-handler';
 
 const API_GATEWAY = process.env.NEXT_PUBLIC_API_GATEWAY || 'http://localhost:8000';
@@ -13,12 +13,66 @@ export default function CropImagePage() {
   const [status, setStatus] = useState<'idle' | 'processing' | 'completed' | 'failed'>('idle');
   const [error, setError] = useState<string | null>(null);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   // Crop values in percentage
   const [top, setTop] = useState(0);
   const [bottom, setBottom] = useState(0);
   const [left, setLeft] = useState(0);
   const [right, setRight] = useState(0);
+
+  // Interactive Dragging State
+  const [isDragging, setIsDragging] = useState(false);
+  const [startPos, setStartPos] = useState({ x: 0, y: 0 });
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const handleFilesSelected = (selectedFiles: File[]) => {
+    setFiles(selectedFiles);
+    if (selectedFiles.length > 0) {
+      const url = URL.createObjectURL(selectedFiles[0]);
+      setPreviewUrl(url);
+      resetSettings();
+    } else {
+      setPreviewUrl(null);
+    }
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!containerRef.current) return;
+    setIsDragging(true);
+    const rect = containerRef.current.getBoundingClientRect();
+    setStartPos({
+      x: ((e.clientX - rect.left) / rect.width) * 100,
+      y: ((e.clientY - rect.top) / rect.height) * 100,
+    });
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || !containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const currentX = ((e.clientX - rect.left) / rect.width) * 100;
+    const currentY = ((e.clientY - rect.top) / rect.height) * 100;
+
+    const x1 = Math.max(0, Math.min(100, startPos.x));
+    const x2 = Math.max(0, Math.min(100, currentX));
+    const y1 = Math.max(0, Math.min(100, startPos.y));
+    const y2 = Math.max(0, Math.min(100, currentY));
+
+    const newLeft = Math.min(x1, x2);
+    const newRight = 100 - Math.max(x1, x2);
+    const newTop = Math.min(y1, y2);
+    const newBottom = 100 - Math.max(y1, y2);
+
+    // Limit to 49% as per slider constraint to avoid negative dimensions
+    setLeft(Math.min(49, newLeft));
+    setRight(Math.min(49, newRight));
+    setTop(Math.min(49, newTop));
+    setBottom(Math.min(49, newBottom));
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
 
   const resetSettings = () => {
     setTop(0);
@@ -74,15 +128,68 @@ export default function CropImagePage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
         <div className="lg:col-span-2 space-y-8">
           <FileUploader 
-            onFilesSelected={setFiles} 
+            onFilesSelected={handleFilesSelected} 
             accept="image/*" 
             isLoading={status === 'processing'}
             title="Upload Image"
             description="Select the image you want to crop"
           />
 
-          {status === 'idle' && files.length > 0 && (
-            <div className="flex flex-col gap-8 p-8 bg-white border border-slate-200 rounded-3xl shadow-sm">
+          {status === 'idle' && files.length > 0 && previewUrl && (
+            <div className="flex flex-col gap-8">
+              {/* Preview Box */}
+              <div className="bg-white border border-slate-200 rounded-3xl p-8 shadow-sm flex flex-col items-center gap-4">
+                <div className="flex items-center justify-between w-full border-b border-slate-100 pb-4 mb-2">
+                  <div className="flex items-center gap-2">
+                    <h4 className="font-bold text-slate-900">Interactive Preview</h4>
+                    <span className="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">New</span>
+                  </div>
+                  <span className="text-xs text-slate-400 font-medium italic flex items-center gap-1">
+                    <MousePointer2 className="w-3 h-3" /> Click and drag on image to select area
+                  </span>
+                </div>
+                
+                <div 
+                  ref={containerRef}
+                  className="relative w-full max-h-[500px] flex items-center justify-center overflow-hidden rounded-xl bg-slate-50 border border-slate-100 p-4 select-none cursor-crosshair"
+                  onMouseDown={handleMouseDown}
+                  onMouseMove={handleMouseMove}
+                  onMouseUp={handleMouseUp}
+                  onMouseLeave={handleMouseUp}
+                >
+                  <div className="relative inline-block">
+                    <img 
+                      src={previewUrl} 
+                      alt="Preview" 
+                      className="max-w-full max-h-[400px] object-contain shadow-md pointer-events-none"
+                    />
+                    
+                    {/* Dark Overlays (Cropped Areas) */}
+                    <div className="absolute top-0 left-0 w-full bg-black/50 pointer-events-none" style={{ height: `${top}%` }} />
+                    <div className="absolute bottom-0 left-0 w-full bg-black/50 pointer-events-none" style={{ height: `${bottom}%` }} />
+                    <div className="absolute top-0 left-0 h-full bg-black/50 pointer-events-none" style={{ width: `${left}%` }} />
+                    <div className="absolute top-0 right-0 h-full bg-black/50 pointer-events-none" style={{ width: `${right}%` }} />
+                    
+                    {/* Clear Area (Keep) */}
+                    <div 
+                      className="absolute border-2 border-white shadow-[0_0_0_1px_rgba(0,0,0,0.5)] pointer-events-none transition-[top,bottom,left,right] duration-100"
+                      style={{
+                        top: `${top}%`,
+                        bottom: `${bottom}%`,
+                        left: `${left}%`,
+                        right: `${right}%`
+                      }}
+                    >
+                      <div className="absolute -top-1 -left-1 w-2 h-2 bg-white rounded-full" />
+                      <div className="absolute -top-1 -right-1 w-2 h-2 bg-white rounded-full" />
+                      <div className="absolute -bottom-1 -left-1 w-2 h-2 bg-white rounded-full" />
+                      <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-white rounded-full" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-8 p-8 bg-white border border-slate-200 rounded-3xl shadow-sm">
               <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                 <h4 className="font-bold text-slate-900">Crop Percentages</h4>
                 <button 
@@ -108,6 +215,7 @@ export default function CropImagePage() {
                 Apply Crop Settings
               </button>
             </div>
+          </div>
           )}
 
           {status === 'processing' && (
@@ -192,7 +300,7 @@ function PercentageInput({ label, value, onChange }: { label: string, value: num
         step={1} 
         value={value} 
         onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600"
+        className="w-full h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600 transition-all"
       />
     </div>
   );

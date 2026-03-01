@@ -13,6 +13,7 @@ export default function EditImagePage() {
   const [status, setStatus] = useState<'idle' | 'processing' | 'completed' | 'failed'>('idle');
   const [error, setError] = useState<string | null>(null);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   // Settings
   const [brightness, setBrightness] = useState(1.0);
@@ -20,6 +21,16 @@ export default function EditImagePage() {
   const [sharpness, setSharpness] = useState(1.0);
   const [grayscale, setGrayscale] = useState(false);
   const [rotate, setRotate] = useState(0);
+
+  const handleFilesSelected = (selectedFiles: File[]) => {
+    setFiles(selectedFiles);
+    if (selectedFiles.length > 0) {
+      const url = URL.createObjectURL(selectedFiles[0]);
+      setPreviewUrl(url);
+    } else {
+      setPreviewUrl(null);
+    }
+  };
 
   const resetSettings = () => {
     setBrightness(1.0);
@@ -77,15 +88,35 @@ export default function EditImagePage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
         <div className="lg:col-span-2 space-y-8">
           <FileUploader 
-            onFilesSelected={setFiles} 
+            onFilesSelected={handleFilesSelected} 
             accept="image/*" 
             isLoading={status === 'processing'}
             title="Upload Image"
             description="Select the image you want to edit"
           />
 
-          {status === 'idle' && files.length > 0 && (
-            <div className="flex flex-col gap-8 p-8 bg-white border border-slate-200 rounded-3xl shadow-sm">
+          {status === 'idle' && files.length > 0 && previewUrl && (
+            <div className="flex flex-col gap-8">
+              {/* Preview Box */}
+              <div className="bg-white border border-slate-200 rounded-3xl p-8 shadow-sm flex flex-col items-center gap-4">
+                <div className="flex items-center justify-between w-full border-b border-slate-100 pb-4 mb-2">
+                  <h4 className="font-bold text-slate-900">Live Preview</h4>
+                  <span className="text-xs text-slate-400 font-medium italic">Approximation of final result</span>
+                </div>
+                <div className="relative w-full max-h-[500px] flex items-center justify-center overflow-hidden rounded-xl bg-slate-50 border border-slate-100 p-4">
+                  <img 
+                    src={previewUrl} 
+                    alt="Preview" 
+                    className="max-w-full max-h-[400px] object-contain shadow-md transition-all duration-200"
+                    style={{
+                      filter: `brightness(${brightness}) contrast(${contrast}) grayscale(${grayscale ? 100 : 0}%)`,
+                      transform: `rotate(${rotate}deg)`,
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-8 p-8 bg-white border border-slate-200 rounded-3xl shadow-sm">
               <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                 <h4 className="font-bold text-slate-900">Adjustments</h4>
                 <button 
@@ -121,6 +152,7 @@ export default function EditImagePage() {
                 Apply Adjustments
               </button>
             </div>
+          </div>
           )}
 
           {status === 'processing' && (
